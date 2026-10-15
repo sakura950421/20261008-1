@@ -1,9 +1,31 @@
-let csvURL = "https://docs.google.com/spreadsheets/d/1CNRa3SFgQ2UZskMK-1pIm11OzQ2DUHgBBOEFCKtZs4o/edit?usp=sharing"; // 設定Google試算表發布後的CSV網址
+let questions = [ // 建立五題題目的陣列
+  { // 第一題資料
+    question: "若 2x + y = 11，且 x + y = 7，則 x = ?", // 設定第一題題目
+    options: ["2", "3", "4", "5"], // 設定四個選項
+    answer: 2 // 設定正確答案為第三個選項，x = 4
+  }, // 第一題結束
+  { // 第二題資料
+    question: "若 x + y = 10，且 2x - y = 5，則 x = ?", // 設定第二題題目
+    options: ["3", "4", "5", "6"], // 設定四個選項
+    answer: 1 // 設定正確答案為第二個選項，x = 5
+  }, // 第二題結束
+  { // 第三題資料
+    question: "若 3x + y = 13，且 x + y = 7，則 x = ?", // 設定第三題題目
+    options: ["2", "3", "4", "5"], // 設定四個選項
+    answer: 1 // 設定正確答案為第二個選項，x = 3
+  }, // 第三題結束
+  { // 第四題資料
+    question: "若 2x + 3y = 16，且 x + y = 6，則 y = ?", // 設定第四題題目
+    options: ["1", "2", "3", "4"], // 設定四個選項
+    answer: 1 // 設定正確答案為第二個選項，y = 2
+  }, // 第四題結束
+  { // 第五題資料
+    question: "若 3x - y = 7，且 x + y = 5，則 x = ?", // 設定第五題題目
+    options: ["2", "3", "4", "5"], // 設定四個選項
+    answer: 1 // 設定正確答案為第二個選項，x = 3
+  } // 第五題結束
+]; // 結束題目陣列
 
-let table; // 儲存從Google試算表讀取到的資料表
-
-let allQuestions = []; // 儲存Google試算表中的完整題庫
-let questions = []; // 儲存本次測驗使用的五題
 let currentQuestion = 0; // 記錄目前正在作答的題目編號
 let score = 0; // 記錄目前得到的分數
 let answered = false; // 記錄目前題目是否已經作答
@@ -13,110 +35,23 @@ let gameFinished = false; // 記錄測驗是否全部結束
 let shaking = false; // 記錄畫面是否正在震動
 let shakeStart = 0; // 記錄畫面震動開始的時間
 let confetti = []; // 建立彩帶粒子的陣列
-let loading = true; // 記錄題庫是否正在載入
-let loadError = false; // 記錄題庫是否載入失敗
 
-async function setup() { // p5.js初始化函式
+function setup() { // p5.js 初始化函式
   createCanvas(windowWidth, windowHeight); // 建立符合視窗大小的畫布
-  textFont("Arial"); // 設定文字使用Arial字型
+  textFont("Arial"); // 設定文字使用 Arial 字型
   rectMode(CENTER); // 設定矩形以中心點作為定位
   textAlign(CENTER, CENTER); // 設定文字水平與垂直置中
+} // setup 函式結束
 
-  try { // 嘗試讀取Google試算表
-    table = await loadTable(csvURL, "csv", "header"); // 等待Google試算表CSV完整載入
-
-    if (!table || table.getRowCount() === 0) { // 如果沒有成功取得任何資料
-      throw new Error("Google試算表沒有資料"); // 主動產生錯誤
-    } // 結束資料存在判斷
-
-    let requiredColumns = ["question", "option1", "option2", "option3", "option4", "answer"]; // 設定必須存在的欄位名稱
-
-    for (let column of requiredColumns) { // 逐一檢查每一個必要欄位
-      if (!table.columns.includes(column)) { // 如果找不到指定欄位
-        throw new Error("找不到欄位：" + column); // 主動產生錯誤
-      } // 結束欄位檢查
-    } // 結束所有欄位檢查
-
-    for (let r = 0; r < table.getRowCount(); r++) { // 逐列讀取Google試算表
-      let questionText = table.getString(r, "question").trim(); // 取得題目文字
-      let option1 = table.getString(r, "option1").trim(); // 取得第一個選項
-      let option2 = table.getString(r, "option2").trim(); // 取得第二個選項
-      let option3 = table.getString(r, "option3").trim(); // 取得第三個選項
-      let option4 = table.getString(r, "option4").trim(); // 取得第四個選項
-      let answerText = table.getString(r, "answer").trim(); // 取得正確答案編號文字
-      let answerNumber = Number(answerText); // 將正確答案轉換成數字
-
-      if (questionText !== "" && option1 !== "" && option2 !== "" && option3 !== "" && option4 !== "" && answerNumber >= 1 && answerNumber <= 4) { // 確認這一列資料完整且正確
-        allQuestions.push({ // 將這一題加入完整題庫
-          question: questionText, // 儲存題目文字
-          options: [option1, option2, option3, option4], // 儲存四個選項
-          answer: answerNumber - 1 // 將試算表的1到4轉成程式使用的0到3
-        }); // 完成單一題目的建立
-      } // 結束資料格式檢查
-    } // 結束讀取所有題目的迴圈
-
-    if (allQuestions.length === 0) { // 如果沒有任何有效題目
-      throw new Error("沒有有效的題目資料"); // 主動產生錯誤
-    } // 結束有效題目判斷
-
-    startNewQuiz(); // 從完整題庫建立第一次測驗
-    loading = false; // 設定題庫載入完成
-  } catch (error) { // 如果Google試算表讀取失敗
-    console.error(error); // 將詳細錯誤顯示在瀏覽器主控台
-    loading = false; // 停止載入狀態
-    loadError = true; // 開啟載入錯誤狀態
-  } // 結束錯誤處理
-} // setup函式結束
-
-function startNewQuiz() { // 建立一次新的測驗
-  let shuffledQuestions = shuffle([...allQuestions]); // 複製完整題庫並將題目順序隨機打亂
-  questions = shuffledQuestions.slice(0, min(5, shuffledQuestions.length)); // 從完整題庫取最多五題
-  currentQuestion = 0; // 將題目回到第一題
-  score = 0; // 將分數歸零
-  answered = false; // 重置作答狀態
-  selectedAnswer = -1; // 清除答案選擇
-  showResult = false; // 關閉結果顯示
-  gameFinished = false; // 關閉測驗完成狀態
-  shaking = false; // 關閉畫面震動
-  confetti = []; // 清除畫面上剩餘的彩帶
-} // startNewQuiz函式結束
-
-function draw() { // p5.js每一幀都會執行的函式
+function draw() { // p5.js 每一幀都會執行的函式
   background("#A9DEF9"); // 設定整個畫面的背景顏色
-
-  if (loading) { // 如果題庫正在載入
-    fill("#333333"); // 設定載入文字顏色
-    noStroke(); // 移除文字外框
-    textSize(min(width * 0.04, 28)); // 根據螢幕寬度設定載入文字大小
-    text("題庫載入中...", width / 2, height / 2); // 顯示題庫載入中的提示
-    return; // 暫停後面的畫面繪製
-  } // 結束題庫載入判斷
-
-  if (loadError) { // 如果題庫載入失敗
-    fill("#333333"); // 設定錯誤文字顏色
-    noStroke(); // 移除文字外框
-    textSize(min(width * 0.035, 24)); // 根據螢幕寬度設定錯誤文字大小
-    text("題庫載入失敗", width / 2, height * 0.43); // 顯示題庫載入失敗
-    textSize(min(width * 0.025, 18)); // 設定錯誤說明文字大小
-    text("請確認Google試算表CSV網址與欄位名稱", width / 2, height * 0.53); // 顯示錯誤說明
-    return; // 暫停後面的畫面繪製
-  } // 結束題庫錯誤判斷
-
-  if (questions.length === 0) { // 如果沒有讀取到任何題目
-    fill("#333333"); // 設定錯誤文字顏色
-    noStroke(); // 移除文字外框
-    textSize(min(width * 0.04, 28)); // 根據螢幕寬度設定錯誤文字大小
-    text("目前沒有可使用的題目。", width / 2, height / 2); // 顯示沒有題目的提示
-    return; // 暫停後面的畫面繪製
-  } // 結束題目數量判斷
 
   let offsetX = 0; // 設定畫面水平震動位移
   let offsetY = 0; // 設定畫面垂直震動位移
 
   if (shaking) { // 如果目前正在震動畫面
     let elapsed = millis() - shakeStart; // 計算震動已經持續多久
-
-    if (elapsed < 350) { // 如果震動時間還不到350毫秒
+    if (elapsed < 350) { // 如果震動時間還不到 350 毫秒
       offsetX = random(-12, 12); // 隨機產生水平震動
       offsetY = random(-12, 12); // 隨機產生垂直震動
     } else { // 如果震動已經結束
@@ -136,7 +71,7 @@ function draw() { // p5.js每一幀都會執行的函式
   pop(); // 恢復畫布狀態
 
   drawConfetti(); // 更新並繪製彩帶
-} // draw函式結束
+} // draw 函式結束
 
 function drawQuestion() { // 繪製題目畫面
   let q = questions[currentQuestion]; // 取得目前題目的資料
@@ -144,7 +79,7 @@ function drawQuestion() { // 繪製題目畫面
   fill("#FFFFFF"); // 設定題號文字顏色
   noStroke(); // 移除文字外框
   textSize(min(width * 0.035, 24)); // 根據螢幕寬度適度縮小題號文字
-  text("第 " + (currentQuestion + 1) + " 題 / " + questions.length, width / 2, height * 0.12); // 顯示目前題號
+  text("第 " + (currentQuestion + 1) + " 題 / 5", width / 2, height * 0.12); // 顯示目前題號
 
   fill("#333333"); // 設定題目文字顏色
   textSize(min(width * 0.035, 34)); // 根據螢幕寬度適度縮小題目文字
@@ -202,7 +137,7 @@ function drawQuestion() { // 繪製題目畫面
       text("點擊空白處進入下一題", width / 2, height * 0.91); // 顯示點擊空白處的提示
     } // 結束最後一題判斷
   } // 結束作答後提示判斷
-} // drawQuestion函式結束
+} // drawQuestion 函式結束
 
 function drawFinalScreen() { // 繪製最後成績畫面
   fill("#333333"); // 設定標題文字顏色
@@ -211,7 +146,7 @@ function drawFinalScreen() { // 繪製最後成績畫面
   text("測驗完成！", width / 2, height * 0.28); // 顯示測驗完成文字
 
   textSize(min(width * 0.055, 55)); // 根據螢幕寬度適度縮小分數文字
-  text("你的總分：" + score + " / " + questions.length, width / 2, height * 0.42); // 顯示玩家總分
+  text("你的總分：" + score + " / 5", width / 2, height * 0.42); // 顯示玩家總分
 
   textSize(min(width * 0.035, 26)); // 根據螢幕寬度適度縮小重新測驗提示
   text("要再測驗一次嗎？", width / 2, height * 0.58); // 顯示重新測驗詢問
@@ -225,16 +160,12 @@ function drawFinalScreen() { // 繪製最後成績畫面
   noStroke(); // 移除文字外框
   textSize(min(width * 0.034, 25)); // 根據螢幕寬度適度縮小按鈕文字
   text("再測驗一次", width / 2, height * 0.70); // 顯示重新測驗文字
-} // drawFinalScreen函式結束
+} // drawFinalScreen 函式結束
 
 function mousePressed() { // 當滑鼠被按下時執行
-  if (loading || loadError || questions.length === 0) { // 如果題庫還沒準備好
-    return; // 不執行任何點擊操作
-  } // 結束題庫狀態判斷
-
   if (gameFinished) { // 如果目前位於最後成績畫面
     if (dist(mouseX, mouseY, width / 2, height * 0.70) < 120) { // 判斷是否點擊重新測驗按鈕
-      startNewQuiz(); // 從完整題庫重新抽取題目
+      restartGame(); // 重新開始測驗
     } // 結束重新測驗按鈕判斷
     return; // 結束這次滑鼠事件
   } // 結束測驗完成判斷
@@ -280,7 +211,7 @@ function mousePressed() { // 當滑鼠被按下時執行
       } // 結束空白區域判斷
     } // 結束最後一題判斷
   } // 結束是否已作答判斷
-} // mousePressed函式結束
+} // mousePressed 函式結束
 
 function nextQuestion() { // 進入下一題或顯示分數的函式
   if (currentQuestion < questions.length - 1) { // 如果還有下一題
@@ -291,10 +222,10 @@ function nextQuestion() { // 進入下一題或顯示分數的函式
   } else { // 如果已經完成最後一題
     gameFinished = true; // 開啟測驗完成狀態
   } // 結束題目判斷
-} // nextQuestion函式結束
+} // nextQuestion 函式結束
 
 function createConfetti() { // 建立彩帶的函式
-  for (let i = 0; i < 70; i++) { // 一次產生70個彩帶
+  for (let i = 0; i < 70; i++) { // 一次產生 70 個彩帶
     let piece = { // 建立單個彩帶物件
       x: random(width * 0.25, width * 0.75), // 設定彩帶隨機水平位置
       y: -random(20, 150), // 設定彩帶從畫面上方開始
@@ -307,7 +238,7 @@ function createConfetti() { // 建立彩帶的函式
     }; // 結束彩帶物件
     confetti.push(piece); // 將彩帶加入彩帶陣列
   } // 結束彩帶產生迴圈
-} // createConfetti函式結束
+} // createConfetti 函式結束
 
 function drawConfetti() { // 更新並繪製彩帶
   for (let i = confetti.length - 1; i >= 0; i--) { // 從最後一個彩帶開始處理
@@ -330,8 +261,19 @@ function drawConfetti() { // 更新並繪製彩帶
       confetti.splice(i, 1); // 將彩帶從陣列中刪除
     } // 結束彩帶刪除判斷
   } // 結束彩帶迴圈
-} // drawConfetti函式結束
+} // drawConfetti 函式結束
+
+function restartGame() { // 重新開始遊戲的函式
+  currentQuestion = 0; // 將題目回到第一題
+  score = 0; // 將分數歸零
+  answered = false; // 重置作答狀態
+  selectedAnswer = -1; // 清除答案選擇
+  showResult = false; // 關閉結果顯示
+  gameFinished = false; // 關閉測驗完成狀態
+  shaking = false; // 關閉畫面震動
+  confetti = []; // 清除畫面上剩餘的彩帶
+} // restartGame 函式結束
 
 function windowResized() { // 當瀏覽器視窗大小改變時執行
   resizeCanvas(windowWidth, windowHeight); // 讓畫布跟著視窗大小重新調整
-} // windowResized函式結束
+} // windowResized 函式結束
